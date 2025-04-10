@@ -407,8 +407,8 @@ radial_viz <- function(data, anchors, color_var) {
     labs(title = "Radial Visualization (RadViz)", color = "G3")
 }
 
-# Example usage with student data
-# Select features (adjust according to your dataset)
+#  With student data
+
 radviz_data <- math_df %>% select(G1, G2, age, Medu, Fedu)
 anchors <- colnames(radviz_data)
 
