@@ -143,7 +143,6 @@ umap_data
 # Normalize the data (UMAP works better with normalized data)
 umap_data <- scale(umap_data)
 
-# Set seed for reproducibility
 
 
 # Compute UMAP
@@ -191,8 +190,8 @@ varImpPlot(rf_model,
 
 # Save predictions
 write.csv(data.frame(Actual = test_data$G3, Predicted = predictions),
- 
-               "predictions.csv", row.names = FALSE)
+          
+          "predictions.csv", row.names = FALSE)
 
 # Select numeric features for 3D plotting
 plot_data <- math_df %>% select(G1, G2, G3, age, Medu, Fedu)
@@ -235,39 +234,14 @@ grid <- expand.grid(G1 = g1_range, G2 = g2_range)
 model <- lm(G3 ~ G1 + G2, data = math_df)
 grid$G3 <- predict(model, newdata = grid)
 
-
-# Create 3D surface plot
-plot_ly(grid, x = ~G1, y = ~G2, z = ~G3, type = "surface",
-        colors = colorRamp(c("blue", "red"))) %>%
-  layout(scene = list(
-    xaxis = list(title = "G1"),
-    yaxis = list(title = "G2"),
-    zaxis = list(title = "G3")
-  ), title = "3D Surface Plot of Grades (G1, G2, G3)")
-
-
-# Fit a regression model (example: G3 ~ G1 + G2)
-model <- lm(G3 ~ G1 + G2, data = math_df)
-
 # Create a grid of G1 and G2 values
 grid <- expand.grid(G1 = seq(min(math_df$G1), max(math_df$G1), length.out = 50),
                     G2 = seq(min(math_df$G2), max(math_df$G2), length.out = 50))
 grid$G3 <- predict(model, newdata = grid)
 
-# Create a 3D surface plot
-plot_ly(grid, x = ~G1, y = ~G2, z = ~G3, type = "surface",
-        colors = colorRamp(c("blue", "red"))) %>%
-  layout(scene = list(
-    xaxis = list(title = "G1 (First Period Grade)"),
-    yaxis = list(title = "G2 (Second Period Grade)"),
-    zaxis = list(title = "G3 (Final Grade)")
-  ), title = "3D Surface Plot of Predicted G3")
-
-
-library(rgl)
-
 
 # Load libraries
+library(rgl)
 library(dbscan)
 
 
@@ -300,7 +274,150 @@ plot_ly(cluster_data, x = ~G1, y = ~G2, z = ~G3, color = ~cluster,
     zaxis = list(title = "G3 (Final Grade)")
   ), title = "3D DBSCAN Clustering of Student Grades")
 
+# Scatter plot
+library(tidyverse)
+library(GGally)
 
+# Select relevant numeric features
+features <- math_df %>% select(G1, G2, G3, age, Medu, Fedu)
+
+# Create scatter plot matrix
+ggpairs(features,
+        columns = 1:6,
+        title = "Scatter Plot Matrix of Student Performance",
+        aes(color = math_df$school, alpha = 0.5)) +  # Color by school (GP/MS)
+  theme_minimal()
+
+# Select features and normalize data (for better visualization)
+#Parallel coordinates
+parallel_data <- math_df %>%
+  select(G1, G2, G3, age, Medu, Fedu, internet) %>%
+  mutate(across(c(G1, G2, G3), scale))  # Normalize grades
+
+# Create parallel coordinates plot
+ggparcoord(parallel_data,
+           columns = 1:6,
+           groupColumn = "internet",  # Group by internet access (0/1)
+           alphaLines = 0.3,
+           title = "Parallel Coordinates Plot") +
+  scale_color_manual(values = c("red", "blue")) +
+  theme_minimal()
+
+
+#Radviz visualization
+
+library(DataVisualizations)
+
+# Select and normalize features (as matrix)
+radviz_data <- math_df %>%
+  select(G1, G2, age, Medu, Fedu) %>%
+  scale() %>% 
+  as.matrix()
+
+# Define a custom RadViz function
+radial_viz <- function(data, anchors, color_by = NULL, alpha = 0.7) {
+  # Normalize data to [0, 1]
+  data_normalized <- apply(data, 2, function(x) (x - min(x)) / (max(x) - min(x)))
+  
+  # Calculate anchor angles
+  n_anchors <- length(anchors)
+  angles <- seq(0, 2 * pi, length.out = n_anchors + 1)[1:n_anchors]
+  
+  # Compute coordinates
+  x <- rowSums(data_normalized * cos(angles))
+  y <- rowSums(data_normalized * sin(angles))
+  coords <- data.frame(x = x / rowSums(data_normalized),
+                       y = y / rowSums(data_normalized))
+  
+  # Plot
+  ggplot(coords, aes(x = x, y = y)) +
+    geom_point(aes(color = color_by), alpha = alpha, size = 3) +
+    geom_text(data = data.frame(x = cos(angles) * 1.1, 
+                                y = sin(angles) * 1.1, 
+                                label = anchors),
+              aes(x = x, y = y, label = label), color = "black", size = 5) +
+    coord_fixed() +
+    theme_void() +
+    labs(title = "Radial Visualization (RadViz)", color = "G3")
+}
+
+
+# Load libraries
+library(tidyverse)
+
+# Select features and normalize
+radviz_data <- math_df %>%
+  select(G1, G2, age, Medu, Fedu) %>%
+  mutate(across(everything(), scale))
+
+# Define anchors (features)
+anchors <- colnames(radviz_data)
+
+# Generate plot colored by G3 grades
+radial_viz(
+  data = radviz_data,
+  anchors = anchors,
+  color_by = math_df$G3  # Color points by final grade
+) +
+  scale_color_gradient(low = "blue", high = "red")  # Gradient for G3
+
+
+# Add anchors (feature names)
+text(cos(seq(0, 2*pi, length.out = 5)) * 1.1, 
+     sin(seq(0, 2*pi, length.out = 5)) * 1.1,
+     labels = colnames(radviz_data), 
+     col = "black", cex = 1.2)
+
+# Plot with color mapping to G3 grades
+
+library(tidyverse)
+
+# Custom RadViz function
+radial_viz <- function(data, anchors, color_var) {
+  # Normalize data to [0, 1]
+  data_norm <- data %>%
+    mutate(across(everything(), ~ (.x - min(.x)) / (max(.x) - min(.x))))
+  
+  # Calculate anchor angles (equally spaced around a circle)
+  n_anchors <- length(anchors)
+  angles <- seq(0, 2 * pi, length.out = n_anchors + 1)[1:n_anchors]
+  
+  # Compute coordinates for each data point
+  coords <- data_norm %>%
+    mutate(
+      x = rowSums(sweep(data_norm, 2, cos(angles), "*")) / rowSums(data_norm),
+      y = rowSums(sweep(data_norm, 2, sin(angles), "*")) / rowSums(data_norm)
+    )
+  
+  # Compute anchor positions (for labels)
+  anchor_coords <- tibble(
+    x = cos(angles) * 1.1,  # Offset anchors slightly outward
+    y = sin(angles) * 1.1,
+    label = anchors
+  )
+  
+  # Plot
+  ggplot(coords, aes(x = x, y = y, color = color_var)) +
+    geom_point(size = 3, alpha = 0.7) +
+    geom_text(data = anchor_coords, aes(x = x, y = y, label = label), 
+              color = "black", size = 5, inherit.aes = FALSE) +
+    scale_color_gradient(low = "blue", high = "red") +
+    coord_fixed() +
+    theme_void() +
+    labs(title = "Radial Visualization (RadViz)", color = "G3")
+}
+
+# Example usage with student data
+# Select features (adjust according to your dataset)
+radviz_data <- math_df %>% select(G1, G2, age, Medu, Fedu)
+anchors <- colnames(radviz_data)
+
+# Generate plot
+radial_viz(
+  data = radviz_data,
+  anchors = anchors,
+  color_var = math_df$G3  # Color by final grade
+)
 
 # Load libraries
 library(ggplot2)
@@ -364,6 +481,11 @@ rmse_full <- sqrt(mean((results$Actual - results$Full_Model)^2))
 rmse_subset <- sqrt(mean((results$Actual - results$Subset_Model)^2))
 print(paste("RMSE (Full Model):", rmse_full))
 print(paste("RMSE (Subset Model):", rmse_subset))
+
+
+
+
+
 
 
 
