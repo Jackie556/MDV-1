@@ -1,2 +1,2 @@
-# MDV-1
+# MDV
  Exercise
