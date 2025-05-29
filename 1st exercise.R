@@ -483,12 +483,212 @@ print(paste("RMSE (Full Model):", rmse_full))
 print(paste("RMSE (Subset Model):", rmse_subset))
 
 
+# Load libraries
+library(tidyverse)
+library(ggplot2)
+
+# Data preprocessing (remove duplicates and convert factors)
+math_df <- math_df %>% distinct()
+math_df <- math_df %>% mutate_if(is.character, as.factor)
+
+# Select numeric features for PCA
+pca_features <- math_df %>% select(age, Medu, Fedu, G1, G2, G3)
+
+# Scale features
+pca_data <- scale(pca_features)
+
+# Perform PCA
+pca_res <- prcomp(pca_data, center = TRUE, scale. = TRUE)
+
+# Variance explained by each PC
+var_explained <- (pca_res$sdev)^2 / sum((pca_res$sdev)^2)
+var_explained_pct <- var_explained * 100
+
+# Print variance explained per component
+print(round(var_explained_pct, 2))
+
+# Cumulative variance for first two PCs
+cum_var <- sum(var_explained_pct[1:2])
+print(paste("Cumulative variance explained by first two PCs:", round(cum_var, 2), "%"))
 
 
 
+# Prepare data frame for plotting
+pca_scores <- as.data.frame(pca_res$x)
+pca_scores$school <- math_df$school
+
+# Plot first two PCs colored by school
+pca_plot <- ggplot(pca_scores, aes(x = PC1, y = PC2, color = school)) +
+  geom_point(alpha = 0.7, size = 2) +
+  labs(title = "PCA: First Two Principal Components",
+       x = paste0("PC1 (", round(var_explained_pct[1], 1), "% variance)"),
+       y = paste0("PC2 (", round(var_explained_pct[2], 1), "% variance)")) +
+  theme_minimal()
+
+# Save plot
+ggsave("pca_scatter.png", plot = pca_plot, width = 8, height = 6)
+
+# Load necessary libraries
+library(tidyverse)
+library(ggplot2)
+
+# Data preprocessing: remove duplicates, convert character to factor
+math_df <- math_df %>% distinct()
+math_df <- math_df %>% mutate_if(is.character, as.factor)
+
+# Select numeric features for PCA
+pca_features <- math_df %>% select(age, Medu, Fedu, G1, G2, G3)
+
+# Scale the features
+pca_data <- scale(pca_features)
+
+# Perform PCA
+pca_res <- prcomp(pca_data, center = TRUE, scale. = TRUE)
+
+# Calculate variance explained
+var_explained <- (pca_res$sdev)^2 / sum((pca_res$sdev)^2)
+var_explained_pct <- var_explained * 100
+cum_var <- cumsum(var_explained_pct)
+
+# Print variance explained
+print(round(var_explained_pct, 2))
+print(round(cum_var, 2))
+
+# Prepare PCA scores dataframe and add school for coloring
+pca_scores <- as.data.frame(pca_res$x)
+pca_scores$school <- math_df$school
+
+# Function to plot and save PC scatter plots
+plot_pc <- function(df, xpc, ypc, xvar, yvar) {
+  p <- ggplot(df, aes_string(x = xpc, y = ypc, color = "school")) +
+    geom_point(alpha = 0.7, size = 2) +
+    labs(title = paste0("PCA: ", xpc, " vs ", ypc),
+         x = paste0(xpc, " (", round(var_explained_pct[xvar], 1), "%)"),
+         y = paste0(ypc, " (", round(var_explained_pct[yvar], 1), "%)")) +
+    theme_minimal()
+  
+  filename <- paste0(tolower(xpc), "_vs_", tolower(ypc), ".png")
+  ggsave(filename, plot = p, width = 8, height = 6)
+  print(p)
+}
+
+# Plot PC1 vs PC2
+plot_pc(pca_scores, "PC1", "PC2", 1, 2)
+
+# Plot PC1 vs PC3
+plot_pc(pca_scores, "PC1", "PC3", 1, 3)
+
+# Plot PC2 vs PC3
+plot_pc(pca_scores, "PC2", "PC3", 2, 3)
+
+# Plot PC1 vs PC4
+plot_pc(pca_scores, "PC1", "PC4", 1, 4)
+
+# Plot PC2 vs PC4
+plot_pc(pca_scores, "PC2", "PC4", 2, 4)
+
+# Plot PC3 vs PC4
+plot_pc(pca_scores, "PC3", "PC4", 3, 4)
+
+# Plot Variance Explained Bar Chart
+var_df <- data.frame(
+  PC = paste0("PC", 1:length(var_explained_pct)),
+  Variance = var_explained_pct,
+  Cumulative = cum_var
+)
+
+p_var <- ggplot(var_df, aes(x = PC, y = Variance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_line(aes(y = Cumulative, group = 1), color = "red", size = 1) +
+  geom_point(aes(y = Cumulative), color = "red", size = 2) +
+  labs(title = "Variance Explained by Principal Components",
+       y = "Variance Explained (%)",
+       caption = "Red line shows cumulative variance") +
+  theme_minimal()
+
+ggsave("variance_explained.png", plot = p_var, width = 8, height = 6)
+print(p_var)
 
 
+#Multidimensional Scaling
 
+
+# Load necessary libraries
+library(tidyverse)
+library(ggplot2)
+
+# Read and prepare data
+
+math_df <- unique(math_df)
+math_df <- math_df %>% mutate_if(is.character, as.factor)
+mds_features <- math_df %>% select(age, Medu, Fedu, G1, G2, G3)
+mds_matrix <- scale(mds_features)
+
+# Compute distance matrix
+dist_matrix <- dist(mds_matrix)
+
+# 1. Classical MDS (cmdscale) - default initialization
+mds_cmd <- cmdscale(dist_matrix, k = 2)
+mds_df1 <- data.frame(MDS1 = mds_cmd[,1], MDS2 = mds_cmd[,2], school = math_df$school)
+
+# 2. Metric MDS with random start (SMACOF)
+library(smacof)
+set.seed(123)
+mds_smacof <- mds(dist_matrix, ndim = 2, type = "interval", init = "random")
+mds_df2 <- data.frame(MDS1 = mds_smacof$conf[,1], MDS2 = mds_smacof$conf[,2], school = math_df$school)
+
+# Plot Classical MDS
+ggplot(mds_df1, aes(x = MDS1, y = MDS2, color = school)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "Classical MDS (cmdscale) on Student Data") +
+  theme_minimal()
+ggsave("mds_classical.png", width = 8, height = 6)
+
+# Plot Metric MDS (SMACOF, random init)
+ggplot(mds_df2, aes(x = MDS1, y = MDS2, color = school)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "Metric MDS (SMACOF, Random Init) on Student Data") +
+  theme_minimal()
+ggsave("mds_smacof.png", width = 8, height = 6)
+
+
+# Assume 'math_df' is my cleaned dataset and contains only numeric columns for depth calculation
+
+# Select relevant numeric features
+data_matrix <- math_df %>% select(age, Medu, Fedu, G1, G2, G3) %>% scale() %>% as.matrix()
+
+# Calculate the center (mean) of the data
+center <- colMeans(data_matrix)
+
+# Calculate Euclidean depth (negative distance to center)
+euclidean_depth <- -apply(data_matrix, 1, function(row) sqrt(sum((row - center)^2)))
+
+# Add the depth to your dataframe
+math_df$euclidean_depth <- euclidean_depth
+
+# Visualize: plot depth vs. G3
+library(ggplot2)
+ggplot(math_df, aes(x = euclidean_depth, y = G3, color = school)) +
+  geom_point() +
+  labs(title = "Euclidean Depth vs Final Grade (G3)", x = "Euclidean Depth (Centrality)", y = "Final Grade")
+
+
+# Calculate the multivariate median (componentwise)
+center_median <- apply(data_matrix, 2, median)
+
+# Calculate Euclidean distance from each point to the median (depth is negative distance)
+euclidean_depth_median <- -apply(data_matrix, 1, function(row) sqrt(sum((row - center_median)^2)))
+
+# Add to data frame
+math_df$euclidean_depth_median <- euclidean_depth_median
+
+# Visualization: Depth vs G3
+library(ggplot2)
+ggplot(math_df, aes(x = euclidean_depth_median, y = G3, color = school)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "Euclidean Depth to Median vs Final Grade (G3)", 
+       x = "Euclidean Depth to Median (Centrality)", y = "Final Grade")
+ggsave("euclidean_depth_median_plot.png", width = 8, height = 6)
 
 
 
